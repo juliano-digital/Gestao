@@ -40,6 +40,7 @@ export type ExpenseFormData = Omit<
 export interface Parcela {
   id: string;
   gasto_id: string;
+  local: string | null;
   numero_parcela: number;
   valor_parcela: number;
   /** "Pago pelos dois" — calculado automaticamente a partir de paga_juliano && paga_lidiane */

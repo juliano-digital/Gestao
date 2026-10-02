@@ -42,14 +42,14 @@ export const getAllParcelas = async (): Promise<Parcela[]> => {
 /**
  * Cria as parcelas de um gasto parcelado, dividindo o valor total igualmente.
  * A última parcela absorve qualquer diferença de arredondamento.
- * "paga" NÃO é enviada aqui: é uma coluna gerada automaticamente pelo banco
- * a partir de paga_juliano/paga_lidiane, e começa como false por padrão
- * assim que as duas colunas nascem como false.
+ *
+ * Agora aceita o parâmetro opcional 'local' para salvar na coluna 'local' do Supabase.
  */
 export const createParcelasForExpense = async (
   gastoId: string,
   valorTotal: number,
-  numeroParcelas: number
+  numeroParcelas: number,
+  local?: string // <- ADICIONADO AQUI (Parâmetro opcional para a localização/estabelecimento)
 ): Promise<void> => {
   const valorBase = Math.floor((valorTotal / numeroParcelas) * 100) / 100;
   const totalBase = valorBase * (numeroParcelas - 1);
@@ -61,6 +61,7 @@ export const createParcelasForExpense = async (
     valor_parcela: i === numeroParcelas - 1 ? valorUltima : valorBase,
     paga_juliano: false,
     paga_lidiane: false,
+    local: local || null, // <- ADICIONADO AQUI: envia a string do local ou null se não for informada
   }));
 
   const { error } = await supabase.from(TABLE_NAME).insert(parcelas);
@@ -72,12 +73,26 @@ export const createParcelasForExpense = async (
 };
 
 /**
+ * Atualiza o campo 'local' de uma parcela específica isoladamente
+ */
+export const updateLocalParcela = async (id: string, local: string): Promise<Parcela> => {
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .update({ local })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro ao atualizar local da parcela:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+/**
  * Marca ou desmarca uma parcela como paga para AMBAS as pessoas de uma vez
- * (campo antigo — mantido por compatibilidade). O campo "paga" é
- * recalculado automaticamente pelo banco.
- *
- * Também grava a data/hora atual em AMBAS as colunas de data de pagamento
- * por pessoa quando "paga" é true, e limpa (null) quando é false.
  */
 export const toggleParcelaPaga = async (id: string, paga: boolean): Promise<Parcela> => {
   const dataPagamento = paga ? new Date().toISOString() : null;
@@ -104,19 +119,6 @@ export const toggleParcelaPaga = async (id: string, paga: boolean): Promise<Parc
 
 /**
  * Marca ou desmarca a parte de UMA pessoa (Juliano ou Lidiane) como paga
- * nesta parcela.
- *
- * IMPORTANTE: atualiza SOMENTE o campo dessa pessoa, em uma única operação
- * atômica — sem ler o estado atual antes. Isso é o que permite clicar em
- * qualquer parcela, de qualquer compra, a qualquer momento, em qualquer
- * ordem (adiantar parcela 3 antes da 2, por exemplo) sem que um clique
- * "atropele" outro.
- *
- * Junto com o campo de "pago", também grava (ou limpa) a data/hora exata
- * em que essa pessoa marcou/desmarcou a parte dela nesta parcela.
- *
- * "paga" (combinado) é recalculado automaticamente pelo banco (coluna
- * gerada), então não precisa ser enviado por aqui.
  */
 export const toggleParcelaPagaPessoa = async (
   id: string,

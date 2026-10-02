@@ -78,7 +78,7 @@ export const createExpense = async (expense: ExpenseFormData): Promise<Expense> 
 
   // Se for parcelado, cria as parcelas automaticamente
   if (expense.forma_pagamento === 'parcelado' && expense.numero_parcelas) {
-    await createParcelasForExpense(data.id, expense.valor, expense.numero_parcelas);
+    await createParcelasForExpense(data.id, expense.valor, expense.numero_parcelas, expense.local);
   }
 
   return data;
